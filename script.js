@@ -1,74 +1,160 @@
-// ------------------------------
-// 🍽️ Restaurant Management System
-// ------------------------------
-
-// 🛒 Cart array (temporary)
+// 🍔 Restaurant Management System
 let cart = [];
 
-// ✅ When page loads
-window.onload = function() {
-  const username = localStorage.getItem("loggedUser");
-  if (username) {
-    loadUserInterface();
+// Default admin credentials
+const ADMIN_USER = "admin";
+const ADMIN_PASS = "12345";
+
+// -------------------------
+// ROLE SELECTION
+// -------------------------
+document.getElementById("roleSelect").addEventListener("change", function() {
+  if (this.value === "admin") {
+    document.getElementById("adminLoginFields").classList.remove("hidden");
+    document.getElementById("userLoginFields").classList.add("hidden");
   } else {
-    document.getElementById("loginSection").style.display = "block";
+    document.getElementById("adminLoginFields").classList.add("hidden");
+    document.getElementById("userLoginFields").classList.remove("hidden");
   }
-};
+});
 
-// ------------------------------
-// 🔐 LOGIN / LOGOUT SYSTEM
-// ------------------------------
-function loginUser() {
-  const username = document.getElementById("username").value.trim();
-  if (!username) {
-    alert("Please enter your name to login!");
-    return;
+// -------------------------
+// LOGIN FUNCTION
+// -------------------------
+function login() {
+  const role = document.getElementById("roleSelect").value;
+
+  if (role === "admin") {
+    const name = document.getElementById("adminName").value.trim();
+    const pass = document.getElementById("adminPass").value.trim();
+
+    if (name === ADMIN_USER && pass === ADMIN_PASS) {
+      localStorage.setItem("loggedRole", "admin");
+      showAdminDashboard();
+    } else {
+      alert("❌ Invalid admin credentials!");
+    }
+
+  } else {
+    const userName = document.getElementById("userName").value.trim();
+    const userPhone = document.getElementById("userPhone").value.trim();
+
+    if (!userName || !userPhone) {
+      alert("Please enter your name and phone number!");
+      return;
+    }
+
+    if (!/^[0-9]{10}$/.test(userPhone)) {
+      alert("Enter a valid 10-digit phone number!");
+      return;
+    }
+
+    localStorage.setItem("loggedRole", "user");
+    localStorage.setItem("loggedUser", userName);
+    localStorage.setItem("loggedPhone", userPhone);
+
+    if (!localStorage.getItem(`orders_${userPhone}`)) {
+      localStorage.setItem(`orders_${userPhone}`, JSON.stringify([]));
+    }
+
+    showUserDashboard();
   }
-
-  localStorage.setItem("loggedUser", username);
-
-  // Create order history if not exists
-  if (!localStorage.getItem(`orders_${username}`)) {
-    localStorage.setItem(`orders_${username}`, JSON.stringify([]));
-  }
-
-  loadUserInterface();
 }
 
-function logoutUser() {
+function logout() {
+  localStorage.removeItem("loggedRole");
   localStorage.removeItem("loggedUser");
+  localStorage.removeItem("loggedPhone");
   location.reload();
 }
 
-function loadUserInterface() {
-  const username = localStorage.getItem("loggedUser");
+// -------------------------
+// ON LOAD
+// -------------------------
+window.onload = function() {
+  const role = localStorage.getItem("loggedRole");
+  if (role === "admin") showAdminDashboard();
+  else if (role === "user") showUserDashboard();
+};
 
-  if (username) {
-    document.getElementById("loginSection").style.display = "none";
-    document.getElementById("mainApp").style.display = "block";
-    document.getElementById("userNameDisplay").textContent = username;
-
-    // Load menu, cart, and order history
-    displayUserMenu();
-    displayCart();
-    showOrderHistory();
-  }
+// -------------------------
+// ADMIN FUNCTIONS
+// -------------------------
+function showAdminDashboard() {
+  document.getElementById("loginSection").classList.add("hidden");
+  document.getElementById("userDashboard").classList.add("hidden");
+  document.getElementById("adminDashboard").classList.remove("hidden");
+  displayAdminMenu();
 }
 
-// ------------------------------
-// 🍱 MENU DISPLAY
-// ------------------------------
+function addMenuItem() {
+  const name = document.getElementById("menuName").value.trim();
+  const price = document.getElementById("menuPrice").value.trim();
+
+  if (!name || !price) {
+    alert("Please enter item name and price!");
+    return;
+  }
+
+  const menuItems = JSON.parse(localStorage.getItem("menuItems")) || [];
+  menuItems.push({ id: Date.now(), name, price: parseFloat(price) });
+  localStorage.setItem("menuItems", JSON.stringify(menuItems));
+
+  document.getElementById("menuName").value = "";
+  document.getElementById("menuPrice").value = "";
+  displayAdminMenu();
+}
+
+function displayAdminMenu() {
+  const menuDiv = document.getElementById("adminMenuList");
+  const menuItems = JSON.parse(localStorage.getItem("menuItems")) || [];
+
+  if (menuItems.length === 0) {
+    menuDiv.innerHTML = "<p>No items added yet.</p>";
+    return;
+  }
+
+  menuDiv.innerHTML = menuItems.map(item => `
+    <div class="menu-card">
+      <b>${item.name}</b> - ₹${item.price}
+      <button onclick="deleteItem(${item.id})">Delete</button>
+    </div>
+  `).join('');
+}
+
+function deleteItem(id) {
+  let menuItems = JSON.parse(localStorage.getItem("menuItems")) || [];
+  menuItems = menuItems.filter(i => i.id !== id);
+  localStorage.setItem("menuItems", JSON.stringify(menuItems));
+  displayAdminMenu();
+}
+
+// -------------------------
+// USER FUNCTIONS
+// -------------------------
+function showUserDashboard() {
+  document.getElementById("loginSection").classList.add("hidden");
+  document.getElementById("adminDashboard").classList.add("hidden");
+  document.getElementById("userDashboard").classList.remove("hidden");
+
+  const username = localStorage.getItem("loggedUser");
+  const userPhone = localStorage.getItem("loggedPhone");
+  document.getElementById("userNameDisplay").textContent = username;
+  document.getElementById("userPhoneDisplay").textContent = userPhone;
+
+  displayUserMenu();
+  displayCart();
+  showOrderHistory();
+}
+
 function displayUserMenu() {
   const menuDiv = document.getElementById("userMenuList");
+  const menuItems = JSON.parse(localStorage.getItem("menuItems")) || [];
 
-  // Example menu (you can add dynamically or from database later)
-  const menuItems = [
-    { id: 1, name: "Veg Burger", price: 120 },
-    { id: 2, name: "Chicken Wrap", price: 180 },
-    { id: 3, name: "French Fries", price: 80 },
-    { id: 4, name: "Paneer Pizza", price: 220 },
-    { id: 5, name: "Cold Coffee", price: 90 }
-  ];
+  if (menuItems.length === 0) {
+    menuDiv.innerHTML = "<p>No menu items available yet.</p>";
+    return;
+  }
 
   menuDiv.innerHTML = menuItems.map(item => `
     <div class="menu-card">
@@ -79,9 +165,6 @@ function displayUserMenu() {
   `).join('');
 }
 
-// ------------------------------
-// 🛒 CART MANAGEMENT
-// ------------------------------
 function orderItem(id, name, price) {
   cart.push({ id, name, price });
   displayCart();
@@ -89,7 +172,6 @@ function orderItem(id, name, price) {
 
 function displayCart() {
   const cartDiv = document.getElementById("cartList");
-
   if (cart.length === 0) {
     cartDiv.innerHTML = "<p>Your cart is empty.</p>";
     return;
@@ -100,26 +182,17 @@ function displayCart() {
     total += item.price;
     return `<div>${item.name} - ₹${item.price}</div>`;
   }).join('');
-
   cartDiv.innerHTML += `<p><b>Total: ₹${total}</b></p>`;
 }
 
-// ------------------------------
-// 💾 PLACE ORDER & SAVE HISTORY
-// ------------------------------
 function placeOrder() {
   if (cart.length === 0) {
     alert("Your cart is empty!");
     return;
   }
 
-  const username = localStorage.getItem("loggedUser");
-  if (!username) {
-    alert("Please login first!");
-    return;
-  }
-
-  const orders = JSON.parse(localStorage.getItem(`orders_${username}`)) || [];
+  const phone = localStorage.getItem("loggedPhone");
+  const orders = JSON.parse(localStorage.getItem(`orders_${phone}`)) || [];
 
   const newOrder = {
     date: new Date().toLocaleString(),
@@ -128,7 +201,7 @@ function placeOrder() {
   };
 
   orders.push(newOrder);
-  localStorage.setItem(`orders_${username}`, JSON.stringify(orders));
+  localStorage.setItem(`orders_${phone}`, JSON.stringify(orders));
 
   alert("✅ Order placed successfully!");
   cart = [];
@@ -136,12 +209,9 @@ function placeOrder() {
   showOrderHistory();
 }
 
-// ------------------------------
-// 📜 ORDER HISTORY DISPLAY
-// ------------------------------
 function showOrderHistory() {
-  const username = localStorage.getItem("loggedUser");
-  const orders = JSON.parse(localStorage.getItem(`orders_${username}`)) || [];
+  const phone = localStorage.getItem("loggedPhone");
+  const orders = JSON.parse(localStorage.getItem(`orders_${phone}`)) || [];
   const historyDiv = document.getElementById("orderHistory");
 
   if (orders.length === 0) {
